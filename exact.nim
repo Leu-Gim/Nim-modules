@@ -1,3 +1,6 @@
+# rational arithmetics
+# author: Miguel (LeuGim)
+
 type
   TExact*[T: typedesc[Ordinal]] = object
     numerator*: T
