@@ -15,9 +15,17 @@
 import macros, typetraits
 
 type
+  ## Rational number
   Exact*[T] = object
     numerator*: T
     denominator*: T
+  ## Rational number with integer part stored apart.
+  ## It can be got from `Exact` with `apart` proc.
+  ## It can be implicitly or explicitly converted to an `Exact`
+  ## for further processing, and it can be converted to string.
+  MixedFraction*[T] = object
+    intPart*: T
+    fraction*: Exact[T]
 
 template max[T1,T2: typedesc[Ordinal]](t1: T1, t2: T2): T1|T2 =
   #if sizeof(t1) >= sizeof(t2): t1 else: t2
@@ -155,6 +163,12 @@ proc reduce*[T: Ordinal](x: Exact[T]): Exact[T]
   result.denominator = (x.denominator.abs /% gcd).T
   if neg: result.numerator *= -1
 
+proc apart*[T: Ordinal](x: Exact[T]): MixedFraction[T] =
+  var x = x.reduce
+  result.intPart = x.numerator div x.denominator
+  result.fraction.numerator = x.numerator - result.intPart * x.denominator
+  result.fraction.denominator = x.denominator
+
 converter intToFrac*[T: Ordinal](x: T): Exact[T] =
   result.numerator   = x
   result.denominator = 1
@@ -175,12 +189,12 @@ proc `*`*[T1,T2: Ordinal](n: T1, x: Exact[T2]): Exact[max(T1,T2)]
   result.denominator = x.denominator
 
 # integer division
-proc `/%`*[T1,T2: Ordinal](x: Exact[T1], n: T2): Exact[max(T1,T2)]
+proc `div`*[T1,T2: Ordinal](x: Exact[T1], n: T2): Exact[max(T1,T2)]
                                               {.noInit, noSideEffect, inline.} =
   result.numerator   = x.numerator
   result.denominator = x.denominator * n
 
-proc `/%`*[T1,T2: Ordinal](n: T1, x: Exact[T2]): Exact[max(T1,T2)]
+proc `div`*[T1,T2: Ordinal](n: T1, x: Exact[T2]): Exact[max(T1,T2)]
                                               {.noInit, noSideEffect, inline.} =
   result.numerator   = x.numerator
   result.denominator = x.denominator * n
@@ -207,7 +221,7 @@ proc `-`*[T1,T2: Ordinal](n: T1, x: Exact[T2]): Exact[max(T1,T2)]
 
 # --- comparison procedures ---
 
-proc `<`*(x: Exact, y: Exact): bool =
+proc `<`*(x: Exact, y: Exact): bool           {.noInit, noSideEffect, inline.} =
   if x.numerator == y.numerator:
     result = x.denominator > y.denominator
   elif x.denominator == y.denominator:
@@ -215,7 +229,7 @@ proc `<`*(x: Exact, y: Exact): bool =
   else:
     result = x.numerator * y.denominator < y.numerator * x.denominator
 
-proc `<=`*(x: Exact, y: Exact): bool =
+proc `<=`*(x: Exact, y: Exact): bool          {.noInit, noSideEffect, inline.} =
   if x.numerator == y.numerator:
     result = x.denominator >= y.denominator
   elif x.denominator == y.denominator:
@@ -223,7 +237,7 @@ proc `<=`*(x: Exact, y: Exact): bool =
   else:
     result = x.numerator * y.denominator <= y.numerator * x.denominator
 
-proc `==`*(x: Exact, y: Exact): bool =
+proc `==`*(x: Exact, y: Exact): bool          {.noInit, noSideEffect, inline.} =
   result =
     x.numerator == y.numerator and
     x.denominator == y.denominator or
@@ -256,6 +270,20 @@ proc apply*[T: Ordinal](x: Exact[T],
   result.numerator   = f(x.numerator.float, n.float).T
   result.denominator = f(x.denominator.float, n.float).T
 
+# --- MixedFraction ---
+
+proc `$`*(x: MixedFraction): string                   {.noInit, noSideEffect.} =
+  let f = x.fraction.reduce
+  result = $x.intPart & '&' &
+    $x.fraction.numerator & '/' & $x.fraction.denominator
+
+proc repr*(x: MixedFraction): string =
+  "MixedFraction(" $x.intPart & "," &
+    $x.fraction.numerator & "/" & $x.fraction.denominator & ")"
+
+converter unmix*[T: Ordinal](x: MixedFraction[T]): Exact[T] = 
+  result.numerator = x.intPart * x.fraction.denominator + x.fraction.numerator
+  result.denominator = x.fraction.denominator
 
 
 
@@ -283,9 +311,16 @@ when isMainModule:
     pow(x.numerator.float, n.float).int % pow(x.denominator.float, n.float).int
   echo c.pow(2)                   # 4/9
 
-  echo 2 % 3 < 4 % 5
+  echo 2 % 3 < 4 % 5              # true
   x = 2 % 10
-  echo x <= 3 % 15
-  echo x == 3 % 15
+  echo x <= 3 % 15                # true
+  echo x == 3 % 15                # true
   # here `x` is converted to float and then compared
-  echo x == 0.2
+  echo x == 0.2                   # true
+
+  x += 3                          # = 32/10
+  echo x                          # 16/5
+  let m = x.apart
+  echo m                          # 3&1/5
+  echo m * 1 ^/ 5                 # 16/25
+
