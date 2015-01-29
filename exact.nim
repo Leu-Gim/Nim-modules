@@ -28,7 +28,7 @@ proc `%`*[T: Ordinal](x, y: T): Exact[T]      {.inline, noInit, noSideEffect.} =
   result.numerator   = x
   result.denominator = y
 
-## for highest precedence
+## has highest precedence, so that ``5 * 3 ^/ 7`` is ``5 * (3 % 7)``
 template `^/`*[T: Ordinal](x, y: T): Exact[T] =
   x % y
 
@@ -205,6 +205,30 @@ proc `-`*[T1,T2: Ordinal](n: T1, x: Exact[T2]): Exact[max(T1,T2)]
   result.numerator   = x.numerator - x.denominator * n
   result.denominator = x.denominator
 
+# --- comparison procedures ---
+
+proc `<`*(x: Exact, y: Exact): bool =
+  if x.numerator == y.numerator:
+    result = x.denominator > y.denominator
+  elif x.denominator == y.denominator:
+    result = x.numerator < y.numerator
+  else:
+    result = x.numerator * y.denominator < y.numerator * x.denominator
+
+proc `<=`*(x: Exact, y: Exact): bool =
+  if x.numerator == y.numerator:
+    result = x.denominator >= y.denominator
+  elif x.denominator == y.denominator:
+    result = x.numerator <= y.numerator
+  else:
+    result = x.numerator * y.denominator <= y.numerator * x.denominator
+
+proc `==`*(x: Exact, y: Exact): bool =
+  result =
+    x.numerator == y.numerator and
+    x.denominator == y.denominator or
+    x.numerator * y.denominator == y.numerator * x.denominator
+
 ## These procedures allow to apply some proc to a rational, like `map` for seqs.
 ## The proc that is applied should take 1 or 2 arguments,
 ## both ordinal or both float, return the same type, and be `nimcall`.
@@ -258,3 +282,10 @@ when isMainModule:
   proc pow(x: Exact[int], n: int): Exact[int] =
     pow(x.numerator.float, n.float).int % pow(x.denominator.float, n.float).int
   echo c.pow(2)                   # 4/9
+
+  echo 2 % 3 < 4 % 5
+  x = 2 % 10
+  echo x <= 3 % 15
+  echo x == 3 % 15
+  # here `x` is converted to float and then compared
+  echo x == 0.2
