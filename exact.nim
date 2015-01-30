@@ -73,6 +73,18 @@ template handlePossibleOverflows(x: (var Exact){lvalue}, y: Exact): stmt =
     y = y.reduce
     rcd(x, y)
 
+# for `rcd` and `rcd1`
+template handlePossibleOverflows(x, y: var Exact, m: var Ordinal): stmt =
+  if  canOverflow(x.numerator, m, sizeof(x.numerator)) or
+      canOverflow(y.numerator, m, sizeof(y.numerator)):
+    let gcd1 = gcd(x.numerator.abs, y.numerator.abs)
+    if gcd1 > 1:
+      let gcd2 = gcd(gcd1, m)
+      if gcd2 > 1:
+        x.numerator = x.numerator div gcd2
+        y.numerator = y.numerator div gcd2
+        m = m div gcd2
+
 
 
 # ============================= C R E A T O R S ============================== #
@@ -114,9 +126,9 @@ proc gcd*[T: Ordinal](x, y: T): T             {.noInit, noSideEffect.} =
   result = x shl shift
 
 ## least common multiple (e.g. lcm(24,18) == 72)
-# overflow check needed
 proc lcm*[T: Ordinal](x, y : T): T            {.noInit, noSideEffect.} =
   # first deviding, then multiplying, to overcome possible overflows
+  echo x.repr, ' ', gcd(x, y), ' ', y.repr
   result = x div gcd(x, y) * y
 
 
@@ -124,24 +136,37 @@ proc lcm*[T: Ordinal](x, y : T): T            {.noInit, noSideEffect.} =
 # =========== T R A N S F O R M A T I O N S  O F  R A T I O N A L S ========== #
 
 ## reduce to a common denominator (e.g. rcd(1%24,1%18) -> (3%72,4%72))
+# overflow check needed
 proc rcd*(x, y: var Exact)                    {.noInit, noSideEffect.} =
   if x.denominator == y.denominator:
     return
-  let m = lcm(x.denominator, y.denominator)
-  x.numerator *= m div x.denominator
+  if canOverflow(x.denominator, y.denominator, sizeof(x.denominator)):
+    x = x.reduce
+    y = y.reduce
+  var m = lcm(x.denominator, y.denominator)
+  let d = m
+  handlePossibleOverflows(x, y, m);
+  x.numerator *= d div x.denominator
+  y.numerator *= d div y.denominator
   x.denominator = m
-  y.numerator *= m div y.denominator
   y.denominator = m
 
 # private version; reduces 1st arg, and returns numerator for the 2nd arg
+# overflow check needed
 proc rcd1[T1,T2: Ordinal](x: var Exact[T1], y: Exact[T2]): max(T1,T2)
                                               {.noInit, noSideEffect.} =
   if x.denominator == y.denominator:
     return y.numerator
-  let m = lcm(x.denominator, y.denominator)
-  x.numerator *= m div x.denominator
+  var y = y
+  if canOverflow(x.denominator, y.denominator, sizeof(result)):
+    x = x.reduce
+    y = y.reduce
+  var m = lcm(x.denominator, y.denominator)
+  let d = m
+  handlePossibleOverflows(x, y, m)
+  x.numerator *= d div x.denominator
   x.denominator = m
-  result = y.numerator * (m div y.denominator)
+  result = y.numerator * (d div y.denominator)
 
 ## convert to the canonical form, e.g. 4/2 becomes 2/1
 proc reduce*[T: Ordinal](x: Exact[T]): Exact[T]
@@ -436,6 +461,10 @@ when isMainModule:
   var z = 3_000'i32 % 500'i32
   y = y * z
   echo y.repr                     # Exact(60000/1)
+  z = 2_000_000_000'i32 % 1_000'i32 + 1_000_000'i32 % 1'i32
+  echo z                          # 3000000/1
+  var q = 100'i8 % 25'i8 + 100'i8 % 35'i8
+  echo q                          # 48/7
 
   y /= 3_000
   echo y                          # 20/1
