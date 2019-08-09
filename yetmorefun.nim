@@ -260,3 +260,23 @@ iterator `..!`*(a, b: Infinite): PossiblyInfinite[InfinitesRepr] =
   else:
     while true:
       yield infNumber[InfinitesRepr](a)
+
+
+#Further considerations, for even more fun:
+#
+#If it makes sense to consider fuzzy numbers (as is represented in the module
+#by ``Infinite(0)`` for fuzzy over exclusive range -∞ .. ∞) and
+#infinite numbers (yet of different orders), does it make sense then
+#to consider fuzzy numbers over larger ranges?
+#
+#Then fuzzies have orders, the same as infinites.
+#May they be asymmetrical? (seems yes, say for ``x = Fuzzy``,
+#i.e. ``Infinite(0)``, i.e. ``fuzzy(-∞ >..< ∞)``,
+#shouldn't ``x * x == fuzzy(0 ..< ∞)``, the same for ``abs(x)``?)
+#(this kitten-face ``>..<`` being for exclusive-at-both-ends range)
+#
+#Should it be considered ``∞ / ∞ == Fuzzy``?
+#Should it be considered ``Infinite(2) / Infinite(2) == fuzzy(2)``
+#(the latter as a shortcut for ``fuzzy(Infinite(2) >..< Infinite(2))``)?
+#
+#How are they to be represented?
