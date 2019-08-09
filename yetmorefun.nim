@@ -14,7 +14,7 @@ proc `-`*(inf: Infinite): Infinite = Infinite(-InfinitesRepr(inf))
 const Fuzzy* = Infinite(0)
 type FiniteOrdinal* = SomeInteger
 type Finite* = SomeNumber
-type Cardinal = Finite | Infinite
+type Cardinal* = Finite | Infinite
 
 # Helpers.
 template def(value): type(value) = default(value.type)
