@@ -1,3 +1,7 @@
+# Further developed version is at
+# https://github.com/Leu-Gim/Nim-modules/blob/master/yetmorefun.nim
+# (in this same repo).
+
 # So, we want to deal with the infinite... even if not really.
 # But to look convincing. :) Just for fun.
 type Infinite* = distinct int
