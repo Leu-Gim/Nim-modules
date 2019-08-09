@@ -14,10 +14,15 @@ proc `-`*(inf: Infinite): Infinite = Infinite(-InfinitesRepr(inf))
 const Fuzzy* = Infinite(0)
 type FiniteOrdinal* = SomeInteger
 type Finite* = SomeNumber
+type Cardinal = Finite | Infinite
+
+# Helpers.
+template def(value): type(value) = default(value.type)
 
 # For cases when a procedure doesn't know in advance, whether it will
 # return only finites or only infinites, and can in fact return both.
-type PossiblyInfinite*[T: FiniteOrdinal] = object
+type SomeFinite = Finite | FiniteOrdinal
+type PossiblyInfinite*[T: SomeFinite] = object
   case isFinite: bool
   of false:
     infValue: Infinite
@@ -26,15 +31,16 @@ type PossiblyInfinite*[T: FiniteOrdinal] = object
 converter toInf*(num: PossiblyInfinite): Infinite =
   if num.isFinite: default(Infinite)
   else: num.infValue
-converter toFin*(num: PossiblyInfinite): FiniteOrdinal =
+converter toFin*(num: PossiblyInfinite): SomeFinite =
   if num.isFinite: num.finValue
-  else: raise newException(ValueError, "Tried to embrace the unembraceable.")
+  else: raise newException(ArithmeticError,
+                            "Tried to embrace the unembraceable.")
 proc `$`*(num: PossiblyInfinite): string =
   if num.isFinite: $num.finValue
   else: $num.infValue
-template finNumber*[T: FiniteOrdinal](n: T): PossiblyInfinite[T] =
+template finNumber*[T: SomeFinite](n: T): PossiblyInfinite[T] =
   PossiblyInfinite[T](isFinite: true, finValue: n)
-template infNumber*[T: FiniteOrdinal](inf: Infinite): PossiblyInfinite[T] =
+template infNumber*[T: SomeFinite](inf: Infinite): PossiblyInfinite[T] =
   PossiblyInfinite[T](isFinite: false, infValue: inf)
 
 # Then we need to breathe some life into them.
@@ -59,6 +65,12 @@ proc `<=`*(n: Finite, inf: Infinite): bool =
   if inf == default(Infinite): n <= 0
   else: inf > default(Infinite)
 
+proc isNegative*(c: Cardinal): bool = c < c.def
+proc isPositive*(c: Cardinal): bool = c > c.def
+proc order*(inf: Infinite): InfinitesRepr = abs(InfinitesRepr(inf))
+proc sign*(c: Cardinal): InfinitesRepr =
+  InfinitesRepr( if c > c.def: 1 elif c < c.def: -1 else: 0 )
+
 # We may do special infinites arithmetics...
 proc `+`*(inf1, inf2: Infinite): Infinite =
   if inf1 == -inf2: Infinite(0)
@@ -73,14 +85,31 @@ proc `+`*(inf: Infinite, n: Finite): Infinite = inf
 proc `+`*(n: Finite, inf: Infinite): Infinite = inf
 proc `-`*(inf: Infinite, n: Finite): Infinite = inf
 proc `-`*(n: Finite, inf: Infinite): Infinite = -inf
-proc `*`*(inf: Infinite, n: Finite): Infinite =
-  if n == default(n.type): Infinite(0)
-  elif n < default(n.type): -inf
-  else: inf
-proc `*`*(n: Finite, inf: Infinite): Infinite =
-  if n == default(n.type): Infinite(0)
-  elif n < default(n.type): -inf
-  else: inf
+# We need ``PossiblyInfinite here``, because of multiplying by zero.
+# It is not fuzzy: from anything however large one gets exactly nothing
+# by taking absolutely nothing of it.
+proc `*`*(inf: Infinite, n: Finite): PossiblyInfinite[n.type] =
+  if n == n.def: finNumber(n.def)
+  elif n < n.def: infNumber[n.type](-inf)
+  else: infNumber[n.type](inf)
+proc `*`*(n: Finite, inf: Infinite): PossiblyInfinite[n.type] =
+  if n == n.def: finNumber(n.def)
+  elif n < n.def: infNumber[n.type](-inf)
+  else: infNumber[n.type](inf)
+proc `/`*(inf: Infinite, n: Finite): Infinite = 
+  if n != n.def:
+    if n.isNegative: -inf else: inf
+  else:
+    # No way. Otherwise by reverting it one could get something from nothing.
+    # And one cannot.
+    raise newException(DivByZeroError, "You cannot!")
+proc `/`*(inf1, inf2: Infinite): Infinite = 
+  # By reversing it, seems so...
+  if inf1.order >= inf2.order:
+    if inf2.isNegative: -inf1
+    else: inf1
+  else: default(Infinite)
+# And so on.
 
 # And we want to show them somehow to users.
 proc `$`*(inf: Infinite): string =
@@ -161,6 +190,13 @@ when isMainModule:
   test2 ∞ - int.high
   test2 -∞ * 3.14
   test2 -∞ * -1'i8
+  test2 -∞ * 0
+  test2 -∞ * Fuzzy
+  test1 -∞ / -∞
+  test2 -∞ / 3.14
+  test2 -∞ / Infinite(2)
+  test2 -∞ / Infinite(0)
+  test2 -∞ / -1
   echo ""
 
   # ================================================
