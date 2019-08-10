@@ -55,17 +55,17 @@ proc abs*(inf: Infinite): Infinite {.borrow.}
 
 # And some of its own. Again, extend it as needed.
 proc `<`*(inf: Infinite, n: Finite): bool =
-  if inf == default(Infinite): n > 0
-  else: inf < default(Infinite)
+  if inf.isDef: n > 0
+  else: inf.isNegative
 proc `<=`*(inf: Infinite, n: Finite): bool =
-  if inf == default(Infinite): n >= 0
-  else: inf < default(Infinite)
+  if inf.isDef: n >= 0
+  else: inf.isNegative
 proc `<`*(n: Finite, inf: Infinite): bool =
-  if inf == default(Infinite): n < 0
-  else: inf > default(Infinite)
+  if inf.isDef: n < 0
+  else: inf.isPositive
 proc `<=`*(n: Finite, inf: Infinite): bool =
-  if inf == default(Infinite): n <= 0
-  else: inf > default(Infinite)
+  if inf.isDef: n <= 0
+  else: inf.isPositive
 
 proc isNegative*(c: Cardinal): bool = c < c.def
 proc isPositive*(c: Cardinal): bool = c > c.def
@@ -79,7 +79,7 @@ proc `+`*(inf1, inf2: Infinite): Infinite =
   elif abs(inf1) < abs(inf2): inf2
   else: inf1
 proc `*`*(inf1, inf2: Infinite): Infinite =
-  if inf1 == default(Infinite) or inf2 == default(Infinite): Infinite(0)
+  if inf1.isDef or inf2.isDef: Infinite(0)
   elif abs(inf1) < abs(inf2): inf2
   else: inf1
 proc `-`*(inf1, inf2: Infinite): Infinite = inf1 + -inf2
@@ -143,7 +143,7 @@ template `^`*(n: Finite, inf: Infinite): PossiblyInfinite[n.type] = pow(n, inf)
 proc `$`*(inf: Infinite): string =
   if inf == ∞: "∞"
   elif inf == -∞: "-∞"
-  elif inf == default(Infinite): "Fuzzy"
+  elif inf.isDef: "Fuzzy"
   # You may add here other `elif`s for other symbols, like subscripted alephs
   else: "inf(" & $InfinitesRepr(inf) & ")"
 
@@ -156,12 +156,12 @@ proc `$`*(inf: Infinite): string =
 # than any finite sequence (any of which would be just arbitrary).
 # More in the comment below.
 iterator items*[T: FiniteOrdinal](s: HSlice[T, Infinite]): PossiblyInfinite[T] =
-  if s.b > default(Infinite):
+  if s.b.isPositive:
     var n = s.a
     while true:
       yield finNumber(n)
       inc n
-  elif s.b < default(Infinite):
+  elif s.b.isNegative:
     var n = s.a
     while true:
       yield finNumber(n)
@@ -291,17 +291,17 @@ when isMainModule:
 # • From finite to infinite.
 # This one always returns finites, so we don't need `PossiblyInifinite`.
 iterator `..!`*[T: FiniteOrdinal](a: T, b: Infinite): T =
-  if b > default(Infinite):
+  if b.isPositive:
     var n = a
     while true:
       yield n
       inc n
-  elif b < default(Infinite):
+  elif b.isNegative:
     var n = a
     while true:
       yield n
       dec n
-  elif a < default(T):
+  elif a.isNegative:
     for n in countup(a, default(T)):
       yield n
   else:
@@ -309,8 +309,8 @@ iterator `..!`*[T: FiniteOrdinal](a: T, b: Infinite): T =
       yield n
 # • From infinite to finite.
 iterator `..!`*[T: FiniteOrdinal](a: Infinite, b: T): PossiblyInfinite[T] =
-  if a == default(Infinite):
-    if b < default(Infinite):
+  if a.isDef:
+    if b.isNegative:
       for n in countdown(default(Infinite), b):
         yield finNumber(n)
     else:
@@ -321,8 +321,8 @@ iterator `..!`*[T: FiniteOrdinal](a: Infinite, b: T): PossiblyInfinite[T] =
       yield infNumber[InfinitesRepr](a)
 # • Between two infinites.
 iterator `..!`*(a, b: Infinite): PossiblyInfinite[InfinitesRepr] =
-  if a == default(Infinite):
-    if b == default(Infinite):
+  if a.isDef:
+    if b.isDef:
       yield infNumber[InfinitesRepr](b)
     else:
       for n in default(InfinitesRepr) ..! b:
