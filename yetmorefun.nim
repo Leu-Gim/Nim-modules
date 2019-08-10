@@ -18,6 +18,7 @@ type Cardinal* = Finite | Infinite
 
 # Helpers.
 template def(value): type(value) = default(value.type)
+template isDef(value): bool = value == default(value.type)
 
 # For cases when a procedure doesn't know in advance, whether it will
 # return only finites or only infinites, and can in fact return both.
@@ -35,6 +36,7 @@ converter toFin*(num: PossiblyInfinite): SomeFinite =
   if num.isFinite: num.finValue
   else: raise newException(ArithmeticError,
                             "Tried to embrace the unembraceable.")
+#converter toPI(n: Finite): PossiblyInfinite[n.type] = PossiblyInfinite[n.type](isFinite: true, finValue: n)
 proc `$`*(num: PossiblyInfinite): string =
   if num.isFinite: $num.finValue
   else: $num.infValue
@@ -106,9 +108,35 @@ proc `/`*(inf: Infinite, n: Finite): Infinite =
 proc `/`*(inf1, inf2: Infinite): Infinite = 
   # By reversing it, seems so...
   if inf1.order >= inf2.order:
+    # For ``-∞ / Infinite(0)`` we get here ``-∞``, as if dividing
+    # by an arbitrary posiitive finite; but that may be
+    # a negative finite as well, in which case we would get ``∞``.
+    # So, result is really spread from -∞ to ∞, i.e. like Fuzzy, but for
+    # infinites of 1st order. We could represent it as say ``fuzzy(1)``.
+    # The same for higher orders.
+    # As we don't have infinite fuzzies, for now leaving as is.
     if inf2.isNegative: -inf1
     else: inf1
   else: default(Infinite)
+proc pow*(n: Finite, inf: Infinite): PossiblyInfinite[n.type] =
+  if n.isDef:
+    if inf.isNegative:
+      raise newException(DivByZeroError, "Do not raise 0 to a negative power.")
+    else:
+      finNumber(n)
+  else:
+    infNumber[n.type](
+      if inf.isDef:
+        inf
+      else:
+        if inf.isNegative:
+          # We don't deal with infinitely small numbers, so returning just..
+          default(Infinite)
+        else:
+          let r = Infinite(inf.order + 1)
+          if n.isNegative: -r else: r
+    )
+template `^`*(n: Finite, inf: Infinite): PossiblyInfinite[n.type] = pow(n, inf)
 # And so on.
 
 # And we want to show them somehow to users.
@@ -171,7 +199,8 @@ when isMainModule:
   template test1(expr: untyped, pad = "  "): untyped = 
     var ex = astToStr(expr)
     for i in ex.len .. 18: ex &= " "
-    echo ex & pad & "      =>      " & $expr
+    let r = try: $expr except ArithmeticError: getCurrentExceptionMsg()
+    echo ex & pad & "      =>      " & r
   template test2(expr: untyped): untyped = test1(expr, "")
 
   echo "\n Comparison / arithmetic \n"
@@ -197,6 +226,11 @@ when isMainModule:
   test2 -∞ / Infinite(2)
   test2 -∞ / Infinite(0)
   test2 -∞ / -1
+  test2 -∞ / 0 # DivByZeroError
+  test2  2 ^ -∞
+  test2  2 ^ ∞
+  test2  0 ^ ∞
+  test2  0 ^ -∞ # DivByZeroError
   echo ""
 
   # ================================================
