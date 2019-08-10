@@ -175,7 +175,7 @@ iterator items*[T: FiniteOrdinal](s: HSlice[T, Infinite]): PossiblyInfinite[T] =
     # It gets itself fuzzy after the first step.
     yield finNumber(s.a)
     while true:
-      yield infNumber[InfinitesRepr](default(Infinite))
+      yield infNumber[T](default(Infinite))
 # • From infinite to finite.
 iterator items*(s: HSlice[Infinite, FiniteOrdinal]): Infinite =
   while true:
@@ -318,7 +318,7 @@ iterator `..!`*[T: FiniteOrdinal](a: Infinite, b: T): PossiblyInfinite[T] =
         yield finNumber(n) # same as above
   else:
     while true:
-      yield infNumber[InfinitesRepr](a)
+      yield infNumber[T](a)
 # • Between two infinites.
 iterator `..!`*(a, b: Infinite): PossiblyInfinite[InfinitesRepr] =
   if a.isDef:
